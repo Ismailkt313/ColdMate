@@ -14,7 +14,11 @@ export class AuthService {
   }
 
   static async register(userData: Record<string, any> | FormData): Promise<StandardResponse<AuthData>> {
-    const res = await api.post<StandardResponse<AuthData>>("/auth/register", userData);
+    const headers: Record<string, string> = {};
+    if (userData instanceof FormData) {
+      headers["Content-Type"] = "multipart/form-data";
+    }
+    const res = await api.post<StandardResponse<AuthData>>("/auth/register", userData, { headers });
     if (res.data.success && res.data.data.accessToken) {
       setAccessToken(res.data.data.accessToken);
     }

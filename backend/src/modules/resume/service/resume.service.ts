@@ -35,7 +35,8 @@ export class ResumeService implements IResumeService {
     const existing = await this.resumeRepository.findByUserId(userId);
     if (existing?.resumePublicId) {
       try {
-        await deleteFromCloudinary(existing.resumePublicId, "raw");
+        const resourceType = existing.resumeUrl.includes("/raw/upload/") ? "raw" : "image";
+        await deleteFromCloudinary(existing.resumePublicId, resourceType);
       } catch {
         // Non-fatal — proceed even if Cloudinary deletion fails
       }
@@ -52,7 +53,8 @@ export class ResumeService implements IResumeService {
 
     if (existing.resumePublicId) {
       try {
-        await deleteFromCloudinary(existing.resumePublicId, "raw");
+        const resourceType = existing.resumeUrl.includes("/raw/upload/") ? "raw" : "image";
+        await deleteFromCloudinary(existing.resumePublicId, resourceType);
       } catch {
         // Non-fatal
       }
@@ -64,11 +66,12 @@ export class ResumeService implements IResumeService {
   private async processAndSave(userId: string, file: Express.Multer.File): Promise<IResume> {
     const fileExt = file.originalname.split(".").pop() || "pdf";
     const uniqueFilename = `resume_${userId}_${Date.now()}.${fileExt}`;
+    const resourceType = file.mimetype === "application/pdf" ? "image" : "raw";
 
     const { secure_url, public_id } = await uploadToCloudinary(
       file.buffer,
       "coldmate/resumes",
-      "raw",
+      resourceType,
       uniqueFilename
     );
 
@@ -76,9 +79,9 @@ export class ResumeService implements IResumeService {
     const isAccessible = await verifyUrlAccessible(secure_url);
     if (!isAccessible) {
       try {
-        await deleteFromCloudinary(public_id, "raw");
+        await deleteFromCloudinary(public_id, resourceType);
       } catch (err) {
-        console.error("Failed to delete corrupted/restricted raw asset from Cloudinary:", err);
+        console.error(`Failed to delete corrupted/restricted ${resourceType} asset from Cloudinary:`, err);
       }
       throw new BadRequestError(
         "The uploaded file could not be verified on the CDN (returned HTTP 401/403/404). " +
