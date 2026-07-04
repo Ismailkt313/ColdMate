@@ -1,12 +1,11 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import dotenv from "dotenv";
 import { connectDB } from "./config/db.config";
 import authRoutes from "./modules/auth/routes/auth.routes";
+import resumeRoutes from "./modules/resume/routes/resume.routes";
 import { errorMiddleware } from "./middleware/error.middleware";
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -23,6 +22,7 @@ app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
 app.use("/auth", authRoutes);
+app.use("/resume", resumeRoutes);
 
 app.use(errorMiddleware);
 

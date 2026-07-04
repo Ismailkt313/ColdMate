@@ -3,6 +3,10 @@ export interface IUser {
   name: string;
   email: string;
   password?: string;
+  providers?: ("LOCAL" | "GOOGLE")[];
+  googleId?: string;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   phone?: string;
   profileImage?: string;
   portfolio?: string;

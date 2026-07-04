@@ -8,4 +8,9 @@ export interface IAuthController {
   getCurrentUser(req: Request, res: Response, next: NextFunction): Promise<any>;
   updateProfile(req: Request, res: Response, next: NextFunction): Promise<any>;
   changePassword(req: Request, res: Response, next: NextFunction): Promise<any>;
+  updateProfileImage(req: Request, res: Response, next: NextFunction): Promise<any>;
+  deleteProfileImage(req: Request, res: Response, next: NextFunction): Promise<any>;
+  googleLogin(req: Request, res: Response, next: NextFunction): Promise<any>;
+  forgotPassword(req: Request, res: Response, next: NextFunction): Promise<any>;
+  resetPassword(req: Request, res: Response, next: NextFunction): Promise<any>;
 }

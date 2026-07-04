@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../errors";
 import { ZodError } from "zod";
+import { MulterError } from "multer";
 
 export const errorMiddleware = (
   err: Error,
@@ -21,6 +22,13 @@ export const errorMiddleware = (
       success: false,
       message: "Validation failed",
       errors: formattedErrors,
+    });
+  }
+
+  if (err instanceof MulterError) {
+    return res.status(400).json({
+      success: false,
+      message: err.code === "LIMIT_FILE_SIZE" ? "File size exceeds the allowed limit" : err.message,
     });
   }
 

@@ -52,3 +52,17 @@ export const changePasswordSchema = z.object({
     newPassword: strongPasswordSchema,
   }),
 });
+
+export const forgotPasswordSchema = z.object({
+  body: z.object({
+    email: z.string({ required_error: "Email is required" }).email("Invalid email format"),
+  }),
+});
+
+export const resetPasswordSchema = z.object({
+  body: z.object({
+    email: z.string({ required_error: "Email is required" }).email("Invalid email format"),
+    token: z.string({ required_error: "Reset token is required" }).min(1, "Reset token is required"),
+    password: strongPasswordSchema,
+  }),
+});

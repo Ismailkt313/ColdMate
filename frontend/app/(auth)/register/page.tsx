@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -20,6 +20,8 @@ import { Input } from "../../../components/ui/input";
 import { PasswordInput } from "../../../components/ui/password-input";
 import { Button } from "../../../components/ui/button";
 import { ErrorMessage } from "../../../components/ui/error-message";
+import { AvatarSelector } from "../../../components/ui/avatar-selector";
+import { Divider } from "../../../components/ui/divider";
 import { AuthService } from "../../../services/auth.service";
 
 const registerSchema = z
@@ -49,6 +51,35 @@ export default function RegisterPage() {
   const router = useRouter();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+ 
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).google) {
+      (window as any).google.accounts.id.initialize({
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "dummy_google_client_id",
+        callback: async (response: any) => {
+          setErrorMsg(null);
+          setSuccessMsg(null);
+          try {
+            const res = await AuthService.googleLogin(response.credential);
+            if (res.success) {
+              setSuccessMsg("Success! Redirecting...");
+              setTimeout(() => {
+                router.push("/");
+              }, 1000);
+            }
+          } catch (err: any) {
+            setErrorMsg(err.response?.data?.message || "Google Registration failed.");
+          }
+        },
+      });
+ 
+      (window as any).google.accounts.id.renderButton(
+        document.getElementById("google-signin-btn"),
+        { theme: "outline", size: "large", width: 336 }
+      );
+    }
+  }, [router]);
 
   const {
     register,
@@ -69,11 +100,15 @@ export default function RegisterPage() {
     setSuccessMsg(null);
 
     try {
-      const res = await AuthService.register({
-        name: data.name,
-        email: data.email,
-        password: data.password,
-      });
+      const formData = new FormData();
+      formData.append("name", data.name);
+      formData.append("email", data.email);
+      formData.append("password", data.password);
+      if (profileImageFile) {
+        formData.append("profileImage", profileImageFile);
+      }
+
+      const res = await AuthService.register(formData);
 
       if (res.success) {
         setSuccessMsg("Account created! Redirecting to verification...");
@@ -109,8 +144,15 @@ export default function RegisterPage() {
               {successMsg}
             </div>
           )}
-
+ 
+          <div id="google-signin-btn" className="w-full flex justify-center pb-2" />
+          <Divider>or</Divider>
+ 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+            <div className="pb-2 flex justify-center">
+              <AvatarSelector onFileSelect={setProfileImageFile} onError={setErrorMsg} />
+            </div>
+
             <div className="space-y-1.5">
               <FormLabel htmlFor="name">Full name</FormLabel>
               <Input

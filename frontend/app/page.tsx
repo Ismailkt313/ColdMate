@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mail, Phone, LogOut, Settings, Bell, MessageSquare, Check, User as UserIcon } from "lucide-react";
+import { Mail, Phone, LogOut, Settings, Bell, MessageSquare, Check, User as UserIcon, Trash2, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 function Github({ className = "h-4 w-4" }: { className?: string }) {
@@ -37,6 +37,7 @@ import { Button } from "../components/ui/button";
 import { ErrorMessage } from "../components/ui/error-message";
 import { AuthService } from "../services/auth.service";
 import { User } from "../types/auth";
+import { ResumeManager } from "../components/resume/resume-manager";
 
 const profileFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -58,6 +59,9 @@ export default function HomePage() {
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -111,6 +115,66 @@ export default function HomePage() {
       setUpdateError(err.response?.data?.message || "Failed to update profile settings.");
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setAvatarError("Only JPG, JPEG, PNG, and WEBP formats are allowed.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("File size exceeds 5MB limit.");
+      return;
+    }
+
+    setAvatarError(null);
+    setUploadingImage(true);
+
+    try {
+      const res = await AuthService.uploadProfileImage(file);
+      if (res.success && res.data.user) {
+        setUser(res.data.user);
+      }
+    } catch (err: any) {
+      setAvatarError(err.response?.data?.message || "Failed to upload avatar.");
+    } finally {
+      setUploadingImage(false);
+      if (avatarFileInputRef.current) {
+        avatarFileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    if (!window.confirm("Are you sure you want to remove your profile image?")) return;
+
+    setAvatarError(null);
+    setUploadingImage(true);
+
+    try {
+      const res = await AuthService.deleteProfileImage();
+      if (res.success && res.data.user) {
+        setUser(res.data.user);
+      }
+    } catch (err: any) {
+      setAvatarError(err.response?.data?.message || "Failed to remove avatar.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const handleChangePasswordClick = (e: React.MouseEvent) => {
+    const providers = user?.providers || ((user as any)?.provider ? [(user as any).provider] : []);
+    if (providers.length > 0 && !providers.includes("LOCAL")) {
+      e.preventDefault();
+      setPasswordError("Password changes are unavailable for Google accounts. Please continue using Google Sign In.");
     }
   };
 
@@ -283,10 +347,68 @@ export default function HomePage() {
                 </form>
               </CardContent>
             </Card>
+
+            <ResumeManager />
           </div>
 
           {/* User Meta Summary Column */}
           <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile Image</CardTitle>
+                <CardDescription>Manage your display avatar picture</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center gap-4">
+                <div className="relative h-24 w-24 rounded-full border border-border/60 overflow-hidden bg-secondary flex items-center justify-center group">
+                  {user.profileImage ? (
+                    <img src={user.profileImage} alt="Avatar" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="font-bold text-xl text-muted-foreground uppercase select-none">
+                      {user.name.split(" ").map((n) => n[0]).join("")}
+                    </div>
+                  )}
+                  {uploadingImage && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 w-full">
+                  <input
+                    type="file"
+                    ref={avatarFileInputRef}
+                    onChange={handleAvatarUpload}
+                    accept=".jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs"
+                    disabled={uploadingImage}
+                    onClick={() => avatarFileInputRef.current?.click()}
+                  >
+                    Change image
+                  </Button>
+                  {user.profileImage && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="px-2"
+                      disabled={uploadingImage}
+                      onClick={handleAvatarDelete}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {avatarError && (
+                  <p className="text-[11px] font-medium text-destructive mt-1 text-center">{avatarError}</p>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Session Data</CardTitle>
@@ -294,8 +416,14 @@ export default function HomePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3 p-3 bg-secondary/35 border border-border/40 rounded-xl">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-bold text-sm text-foreground uppercase">
-                    {user.name.split(" ").map((n) => n[0]).join("")}
+                  <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center overflow-hidden">
+                    {user.profileImage ? (
+                      <img src={user.profileImage} alt={user.name} className="h-full w-full object-cover animate-fade-in" />
+                    ) : (
+                      <span className="font-bold text-sm text-foreground uppercase select-none">
+                        {user.name.split(" ").map((n) => n[0]).join("")}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-foreground">{user.name}</h4>
@@ -330,8 +458,13 @@ export default function HomePage() {
                 <CardDescription>Secured interface link</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
+                {passwordError && (
+                  <div className="mb-2 p-2 rounded-md bg-destructive/10 border border-destructive/20 text-[10px] text-destructive font-medium leading-normal">
+                    {passwordError}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">Click below to navigate to password reset operations.</p>
-                <Link href="/reset-password">
+                <Link href="/reset-password" onClick={handleChangePasswordClick}>
                   <Button variant="outline" className="w-full text-xs h-8">
                     Go to change password
                   </Button>

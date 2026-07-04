@@ -2,6 +2,7 @@ export interface User {
   _id: string;
   name: string;
   email: string;
+  providers?: ("LOCAL" | "GOOGLE")[];
   phone?: string;
   profileImage?: string;
   portfolio?: string;

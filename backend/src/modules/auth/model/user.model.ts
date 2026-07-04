@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { IUser } from "../types";
 
 export interface IUserDocument extends Omit<IUser, "_id" | "password">, Document {
-  password: string;
+  password?: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -24,7 +24,13 @@ const UserSchema = new Schema<IUserDocument>(
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
+      required: [
+        function (this: any) {
+          const providers = this.providers || [];
+          return providers.length === 0 || providers.includes("LOCAL");
+        },
+        "Password is required",
+      ],
       minlength: [8, "Password must be at least 8 characters"],
     },
     phone: {
@@ -73,6 +79,23 @@ const UserSchema = new Schema<IUserDocument>(
       type: Number,
       default: 7,
     },
+    providers: {
+      type: [String],
+      enum: ["LOCAL", "GOOGLE"],
+      default: ["LOCAL"],
+    },
+    googleId: {
+      type: String,
+      default: undefined,
+    },
+    resetPasswordToken: {
+      type: String,
+      default: undefined,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      default: undefined,
+    },
   },
   {
     timestamps: true,
@@ -80,7 +103,7 @@ const UserSchema = new Schema<IUserDocument>(
 );
 
 UserSchema.pre<IUserDocument>("save", async function (next) {
-  if (!this.isModified("password")) {
+  if (!this.isModified("password") || !this.password) {
     return next();
   }
 
@@ -94,6 +117,7 @@ UserSchema.pre<IUserDocument>("save", async function (next) {
 });
 
 UserSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
+  if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
 

@@ -19,6 +19,7 @@ import { FormLabel } from "../../../components/ui/form-label";
 import { Input } from "../../../components/ui/input";
 import { Button } from "../../../components/ui/button";
 import { ErrorMessage } from "../../../components/ui/error-message";
+import { AuthService } from "../../../services/auth.service";
 
 const forgotPasswordSchema = z.object({
   email: z
@@ -32,6 +33,7 @@ type ForgotPasswordFields = z.infer<typeof forgotPasswordSchema>;
 export default function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false);
   const [targetEmail, setTargetEmail] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const {
     register,
@@ -45,9 +47,14 @@ export default function ForgotPasswordPage() {
   });
 
   const onSubmit = async (data: ForgotPasswordFields) => {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setTargetEmail(data.email);
-    setSubmitted(true);
+    setErrorMsg(null);
+    try {
+      await AuthService.forgotPassword(data.email);
+      setTargetEmail(data.email);
+      setSubmitted(true);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.message || "Failed to process request. Please try again.");
+    }
   };
 
   if (submitted) {
@@ -91,6 +98,12 @@ export default function ForgotPasswordPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {errorMsg && (
+            <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/20 text-xs text-destructive font-medium">
+              {errorMsg}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <div className="space-y-1.5">
               <FormLabel htmlFor="email">Email address</FormLabel>

@@ -7,4 +7,9 @@ export interface IAuthService {
   getCurrentUser(id: string): Promise<Omit<IUser, "password">>;
   updateProfile(id: string, profileData: Partial<IUser>): Promise<Omit<IUser, "password">>;
   changePassword(id: string, currentPass: string, newPass: string): Promise<void>;
+  updateProfileImage(id: string, fileBuffer: Buffer): Promise<Omit<IUser, "password">>;
+  deleteProfileImage(id: string): Promise<Omit<IUser, "password">>;
+  googleLogin(idToken: string): Promise<AuthResponse & { refreshToken: string }>;
+  forgotPassword(email: string): Promise<void>;
+  resetPassword(email: string, token: string, newPass: string): Promise<void>;
 }

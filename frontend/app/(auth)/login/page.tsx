@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -20,6 +20,7 @@ import { Input } from "../../../components/ui/input";
 import { PasswordInput } from "../../../components/ui/password-input";
 import { Button } from "../../../components/ui/button";
 import { ErrorMessage } from "../../../components/ui/error-message";
+import { Divider } from "../../../components/ui/divider";
 import { AuthService } from "../../../services/auth.service";
 
 const loginSchema = z.object({
@@ -40,6 +41,34 @@ function LoginForm() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const infoMessage = searchParams.get("message");
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).google) {
+      (window as any).google.accounts.id.initialize({
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "dummy_google_client_id",
+        callback: async (response: any) => {
+          setErrorMsg(null);
+          setSuccessMsg(null);
+          try {
+            const res = await AuthService.googleLogin(response.credential);
+            if (res.success) {
+              setSuccessMsg("Success! Redirecting...");
+              setTimeout(() => {
+                router.push("/");
+              }, 1000);
+            }
+          } catch (err: any) {
+            setErrorMsg(err.response?.data?.message || "Google Sign In failed.");
+          }
+        },
+      });
+
+      (window as any).google.accounts.id.renderButton(
+        document.getElementById("google-signin-btn"),
+        { theme: "outline", size: "large", width: 336 }
+      );
+    }
+  }, [router]);
 
   const {
     register,
@@ -99,6 +128,9 @@ function LoginForm() {
             {successMsg}
           </div>
         )}
+
+        <div id="google-signin-btn" className="w-full flex justify-center pb-2" />
+        <Divider>or</Divider>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div className="space-y-1.5">
