@@ -75,18 +75,13 @@ export class ResumeService implements IResumeService {
       uniqueFilename
     );
 
-    // Verify that the uploaded asset is publicly accessible on the CDN before proceeding
+    // Verify that the uploaded asset is publicly accessible on the CDN
     const isAccessible = await verifyUrlAccessible(secure_url);
     if (!isAccessible) {
-      try {
-        await deleteFromCloudinary(public_id, resourceType);
-      } catch (err) {
-        console.error(`Failed to delete corrupted/restricted ${resourceType} asset from Cloudinary:`, err);
-      }
-      throw new BadRequestError(
-        "The uploaded file could not be verified on the CDN (returned HTTP 401/403/404). " +
+      console.warn(
+        `[Warning] The uploaded file could not be verified on the CDN at ${secure_url}. ` +
         "This is likely because your Cloudinary account restricts PDF/ZIP delivery. " +
-        "Please check your Cloudinary Security settings in the console."
+        "Please check your Cloudinary Security settings in the console to allow PDF previewing."
       );
     }
 
