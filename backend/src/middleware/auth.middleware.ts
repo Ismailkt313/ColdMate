@@ -4,15 +4,20 @@ import { JwtUtils } from "../utils/jwt.utils";
 
 export const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   try {
+    let token = "";
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
+    } else if (req.query.token && typeof req.query.token === "string") {
+      token = req.query.token;
+    }
+
+    if (!token) {
       throw new UnauthorizedError("Access token required");
     }
 
-    const token = authHeader.split(" ")[1];
     const decoded = JwtUtils.verifyAccessToken(token);
-
     req.user = decoded;
     next();
   } catch (error) {

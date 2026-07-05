@@ -7,6 +7,10 @@ export class ResumeRepository implements IResumeRepository {
     return ResumeModel.findOne({ userId });
   }
 
+  async findById(id: string): Promise<IResumeDocument | null> {
+    return ResumeModel.findById(id);
+  }
+
   async upsert(userId: string, data: Partial<IResume>): Promise<IResumeDocument> {
     const resume = await ResumeModel.findOneAndUpdate(
       { userId },

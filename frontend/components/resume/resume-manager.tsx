@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { IResume } from "../../types/resume";
 import { ResumeService } from "../../services/resume.service";
+import { getAccessToken } from "../../lib/axios";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 
@@ -190,13 +191,13 @@ export function ResumeManager({ onResumeChange }: ResumeManagerProps) {
     if (isPdf && canPreviewPdf) {
       setShowPreviewModal(true);
     } else {
-      window.open(resume.resumeUrl, "_blank");
+      window.open(`${resume.resumeUrl}?token=${getAccessToken()}`, "_blank");
     }
   };
 
   const handleDownloadResume = () => {
     if (!resume) return;
-    const downloadUrl = resume.resumeUrl.replace("/upload/", "/upload/fl_attachment/");
+    const downloadUrl = `${resume.resumeUrl}?download=true&token=${getAccessToken()}`;
     window.open(downloadUrl, "_blank");
   };
 
@@ -255,6 +256,7 @@ export function ResumeManager({ onResumeChange }: ResumeManagerProps) {
   }
 
   const isPdf = resume ? (resume.resumeName.toLowerCase().endsWith(".pdf") || resume.resumeUrl.toLowerCase().includes(".pdf")) : false;
+  const authenticatedResumeUrl = resume ? `${resume.resumeUrl}?token=${getAccessToken()}` : "";
 
   return (
     <>
@@ -570,7 +572,7 @@ export function ResumeManager({ onResumeChange }: ResumeManagerProps) {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <a
-                  href={resume.resumeUrl}
+                  href={authenticatedResumeUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold hover:bg-accent text-muted-foreground hover:text-foreground border border-border/50 transition-colors"
@@ -591,7 +593,7 @@ export function ResumeManager({ onResumeChange }: ResumeManagerProps) {
             <div className="flex-1 p-0 bg-secondary/10 overflow-hidden relative">
               {isPdf ? (
                 <iframe
-                  src={resume.resumeUrl}
+                  src={authenticatedResumeUrl}
                   className="w-full h-full border-0"
                   title="Resume PDF Preview"
                 />

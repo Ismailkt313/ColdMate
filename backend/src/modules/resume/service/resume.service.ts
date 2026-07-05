@@ -12,7 +12,7 @@ import { ResumeExtractorService } from "../../../services/resume-extractor.servi
 import { AIService } from "../../../services/ai.service";
 
 export class ResumeService implements IResumeService {
-  constructor(private resumeRepository: IResumeRepository) {}
+  constructor(private resumeRepository: IResumeRepository) { }
 
   async uploadResume(userId: string, file: Express.Multer.File): Promise<IResume> {
     const existing = await this.resumeRepository.findByUserId(userId);
@@ -29,6 +29,14 @@ export class ResumeService implements IResumeService {
       throw new NotFoundError("No resume found. Please upload your resume.");
     }
     return this.formatResume(resume);
+  }
+
+  async getResumeById(id: string): Promise<any> {
+    const resume = await this.resumeRepository.findById(id);
+    if (!resume) {
+      throw new NotFoundError("Resume not found");
+    }
+    return resume;
   }
 
   async replaceResume(userId: string, file: Express.Multer.File): Promise<IResume> {
@@ -66,7 +74,7 @@ export class ResumeService implements IResumeService {
   private async processAndSave(userId: string, file: Express.Multer.File): Promise<IResume> {
     const fileExt = file.originalname.split(".").pop() || "pdf";
     const uniqueFilename = `resume_${userId}_${Date.now()}.${fileExt}`;
-    const resourceType = file.mimetype === "application/pdf" ? "image" : "raw";
+    const resourceType = "raw";
 
     const { secure_url, public_id } = await uploadToCloudinary(
       file.buffer,
@@ -107,6 +115,8 @@ export class ResumeService implements IResumeService {
 
   private formatResume(resume: any): IResume {
     const obj = resume.toObject ? resume.toObject() : { ...resume };
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+    obj.resumeUrl = `${backendUrl}/resume/view/${obj._id}`;
     delete obj.extractedText;
     delete obj.resumePublicId;
     return obj;

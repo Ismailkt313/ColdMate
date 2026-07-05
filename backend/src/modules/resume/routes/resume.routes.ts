@@ -13,6 +13,7 @@ const resumeController = new ResumeController(resumeService);
 
 router.post("/upload", authMiddleware, resumeUpload.single("resume"), resumeController.uploadResume);
 router.get("/", authMiddleware, resumeController.getResume);
+router.get("/view/:id", authMiddleware, resumeController.viewResume);
 router.patch("/", authMiddleware, resumeUpload.single("resume"), resumeController.replaceResume);
 router.delete("/", authMiddleware, resumeController.deleteResume);
 
