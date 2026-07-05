@@ -1,7 +1,7 @@
 import { IResumeService } from "../interface/resume.service.interface";
 import { IResumeRepository } from "../interface/resume.repository.interface";
 import { IResume } from "../types";
-import { NotFoundError, BadRequestError } from "../../../errors";
+import { NotFoundError, BadRequestError, DocumentValidationError } from "../../../errors";
 import {
   uploadToCloudinary,
   deleteFromCloudinary,
@@ -10,6 +10,7 @@ import {
 } from "../../../config/cloudinary.config";
 import { ResumeExtractorService } from "../../../services/resume-extractor.service";
 import { AIService } from "../../../services/ai.service";
+import { DocumentValidationService } from "../../../services/document-validation.service";
 
 export class ResumeService implements IResumeService {
   constructor(private resumeRepository: IResumeRepository) { }
@@ -97,6 +98,33 @@ export class ResumeService implements IResumeService {
       file.buffer,
       file.mimetype
     );
+
+    // AI Document Validation
+    const validationResult = await DocumentValidationService.validate(extractedText);
+    
+    if (!validationResult.isResume || validationResult.confidence < 70) {
+      try {
+        await deleteFromCloudinary(public_id, resourceType);
+      } catch (err) {
+        console.error(`Failed to delete invalid raw file from Cloudinary:`, err);
+      }
+
+      let message = "";
+      if (validationResult.confidence < 70) {
+        message = "We couldn't confidently identify this document as a professional resume. Please upload a valid resume in PDF or DOCX format.";
+      } else {
+        const readableType = validationResult.documentType
+          .toLowerCase()
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+        const vowels = ["a", "e", "i", "o", "u"];
+        const startsWithVowel = vowels.includes(readableType.charAt(0).toLowerCase());
+        const article = startsWithVowel ? "an" : "a";
+        message = `The uploaded document appears to be ${article} ${readableType}. Please upload a professional resume in PDF or DOCX format.`;
+      }
+
+      throw new DocumentValidationError(message, validationResult.documentType);
+    }
 
     const parsedData = await AIService.parseResume(extractedText);
 

@@ -10,5 +10,6 @@ export abstract class CustomError extends Error {
     success: boolean;
     message: string;
     errors?: Array<{ message: string; field?: string }>;
+    documentType?: string;
   };
 }

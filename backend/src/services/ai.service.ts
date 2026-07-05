@@ -89,6 +89,24 @@ No markdown block, no code fences, no explanations, no text before or after the 
 Start your response with { and end with }.
 `;
 
+const DOCUMENT_VALIDATION_PROMPT = `
+Analyze the following document text and determine if it is a professional resume or CV.
+Categorize the document into one of these types:
+RESUME, CV, COVER_LETTER, INVOICE, BILL, BANK_STATEMENT, AADHAAR, PAN_CARD, PASSPORT, DRIVING_LICENSE, CERTIFICATE, MARKSHEET, LETTER, AGREEMENT, OTHER
+
+Return a valid JSON object matching this exact structure:
+{
+  "isResume": true,
+  "documentType": "RESUME",
+  "confidence": 99,
+  "reason": "..."
+}
+
+Rules:
+1. Return ONLY valid JSON. No markdown, no explanations, no code blocks.
+2. If the document is a resume or CV, isResume must be true. For all other types, it must be false.
+`;
+
 /**
  * Clean and parse the raw JSON string safely
  */
@@ -237,6 +255,36 @@ export class AIService {
     throw new BadRequestError(
       "The AI response validation failed. The returned structure was malformed. Please try again."
     );
+  }
+
+  /**
+   * Validate if the extracted text belongs to a professional resume
+   */
+  static async validateDocument(extractedText: string): Promise<{
+    isResume: boolean;
+    documentType: string;
+    confidence: number;
+    reason: string;
+  }> {
+    const provider = getAIProvider();
+    const raw = await provider.parseResume(extractedText, DOCUMENT_VALIDATION_PROMPT);
+    const cleaned = raw
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/```\s*$/i, "")
+      .trim();
+
+    try {
+      const parsed = JSON.parse(cleaned);
+      return {
+        isResume: Boolean(parsed.isResume),
+        documentType: String(parsed.documentType || "OTHER").toUpperCase(),
+        confidence: Number(parsed.confidence ?? 0),
+        reason: String(parsed.reason || "")
+      };
+    } catch {
+      throw new BadRequestError("Failed to validate document structure from Google Gemini API.");
+    }
   }
 
   /**

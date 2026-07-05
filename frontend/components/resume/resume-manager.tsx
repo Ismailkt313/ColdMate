@@ -39,6 +39,14 @@ function validateFile(file: File): string | null {
   return null;
 }
 
+function getUploadStageText(progress: number): string {
+  if (progress < 25) return "Uploading...";
+  if (progress < 50) return "Extracting document...";
+  if (progress < 75) return "Validating document...";
+  if (progress < 100) return "Parsing resume...";
+  return "Completed";
+}
+
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
     year: "numeric",
@@ -158,7 +166,33 @@ export function ResumeManager({ onResumeChange }: ResumeManagerProps) {
     } catch (e: any) {
       clearInterval(progress);
       setUploadProgress(0);
-      setError(e.response?.data?.message || "Upload failed. Please try again.");
+      
+      let errorMessage = "Upload failed. Please try again.";
+      if (e.response?.data) {
+        const { message, documentType } = e.response.data;
+        if (documentType) {
+          if (documentType === "OTHER") {
+            errorMessage = "We couldn't confidently identify this document as a professional resume. Please upload a valid resume in PDF or DOCX format.";
+          } else {
+            const readable = documentType
+              .toLowerCase()
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (c: string) => c.toUpperCase());
+            const vowels = ["a", "e", "i", "o", "u"];
+            const startsWithVowel = vowels.includes(readable.charAt(0).toLowerCase());
+            const article = startsWithVowel ? "an" : "a";
+            
+            if (documentType === "BANK_STATEMENT") {
+              errorMessage = `The uploaded document appears to be a Bank Statement. Only resumes can be uploaded.`;
+            } else {
+              errorMessage = `The uploaded document appears to be ${article} ${readable}. Please upload your resume.`;
+            }
+          }
+        } else {
+          errorMessage = message || errorMessage;
+        }
+      }
+      setError(errorMessage);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -286,7 +320,7 @@ export function ResumeManager({ onResumeChange }: ResumeManagerProps) {
           {uploading && (
             <div className="space-y-1.5">
               <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>Uploading and parsing with AI…</span>
+                <span>{getUploadStageText(uploadProgress)}</span>
                 <span>{uploadProgress}%</span>
               </div>
               <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
