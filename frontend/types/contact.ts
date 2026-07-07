@@ -29,7 +29,7 @@ export interface IContact {
   validationStatus: ValidationStatus;
   aiNotes?: string;
   isPreferred?: boolean;
-  verifiedAt?: Date;
-  createdAt?: Date;
-  updatedAt?: Date;
+  verifiedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }

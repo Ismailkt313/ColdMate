@@ -581,6 +581,18 @@ export class AIService {
   }
 
   /**
+   * Helper to execute general prompt queries routing to the active AI provider
+   */
+  static async generateText(prompt: string): Promise<string> {
+    const provider = getAIProvider();
+    if (provider.generateText) {
+      return provider.generateText(prompt);
+    }
+    throw new InternalServerError("The selected provider does not support text generation");
+  }
+
+
+  /**
    * Classify response emails (e.g. positive, negative, auto-reply)
    */
   static async classifyReply(prompt: string): Promise<string> {

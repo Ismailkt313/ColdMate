@@ -25,6 +25,8 @@ import {
   UserCheck,
   Check,
   Briefcase,
+  Mail,
+  Phone,
 } from "lucide-react";
 
 function Github({ className = "h-4 w-4" }: { className?: string }) {
@@ -54,6 +56,10 @@ import { ThemeToggle } from "../../../components/ui/theme-toggle";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { EditCompanyDialog } from "../../../components/company/edit-company-dialog";
+import { IContact } from "../../../types/contact";
+import { ContactService } from "../../../services/contact.service";
+import { DiscoverContactsDialog } from "../../../components/contact/discover-contacts-dialog";
+
 
 type ActiveTab = "overview" | "ai" | "notes" | "contacts" | "outreach" | "activity";
 
@@ -74,11 +80,18 @@ export default function CompanyDetailsPage() {
 
   // Dialogs
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDiscoverOpen, setIsDiscoverOpen] = useState(false);
+
+  // Contacts Tab state
+  const [contacts, setContacts] = useState<IContact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [contactSort, setContactSort] = useState<"confidence" | "role" | "recent">("confidence");
 
   // Notes state
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesSuccess, setNotesSuccess] = useState(false);
+
 
   // Check auth
   useEffect(() => {
@@ -98,6 +111,27 @@ export default function CompanyDetailsPage() {
     }
     checkAuth();
   }, [router]);
+
+  const fetchContacts = useCallback(async () => {
+    setLoadingContacts(true);
+    try {
+      const res = await ContactService.getContacts(id);
+      if (res.success && res.data) {
+        setContacts(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch contacts", err);
+    } finally {
+      setLoadingContacts(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (user && id) {
+      fetchContacts();
+    }
+  }, [user, id, fetchContacts]);
+
 
   // Load details
   const fetchCompany = useCallback(async () => {
@@ -162,6 +196,30 @@ export default function CompanyDetailsPage() {
       setSavingNotes(false);
     }
   };
+
+  const handleTogglePreferred = async (contactId: string, currentVal: boolean) => {
+    try {
+      const res = await ContactService.updateContact(contactId, { isPreferred: !currentVal });
+      if (res.success) {
+        fetchContacts();
+      }
+    } catch (err) {
+      console.error("Failed to toggle preferred contact", err);
+    }
+  };
+
+  const handleDeleteContact = async (contactId: string) => {
+    if (!window.confirm("Are you sure you want to delete this contact?")) return;
+    try {
+      const res = await ContactService.deleteContact(contactId);
+      if (res.success) {
+        fetchContacts();
+      }
+    } catch (err) {
+      console.error("Failed to delete contact", err);
+    }
+  };
+
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "N/A";
@@ -351,11 +409,15 @@ export default function CompanyDetailsPage() {
             </button>
             <button
               onClick={() => setActiveTab("contacts")}
-              className="flex items-center gap-2 text-xs font-medium px-4 py-2.5 rounded-lg text-muted-foreground/60 cursor-not-allowed whitespace-nowrap"
-              disabled
+              className={`flex items-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors whitespace-nowrap ${
+                activeTab === "contacts"
+                  ? "bg-primary text-primary-foreground font-bold shadow"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+              }`}
             >
-              <Users className="h-4 w-4" /> Contacts <span className="text-[8px] bg-secondary text-muted-foreground px-1 py-0.2 rounded border border-border/40">Soon</span>
+              <Users className="h-4 w-4" /> Contacts
             </button>
+
             <button
               onClick={() => setActiveTab("outreach")}
               className="flex items-center gap-2 text-xs font-medium px-4 py-2.5 rounded-lg text-muted-foreground/60 cursor-not-allowed whitespace-nowrap"
@@ -795,9 +857,237 @@ export default function CompanyDetailsPage() {
                 </div>
               </Card>
             )}
+
+            {/* CONTACTS TAB */}
+            {activeTab === "contacts" && (
+              <div className="space-y-6">
+                <Card>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border/40">
+                    <div>
+                      <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                        <Users className="h-4 w-4 text-primary" /> Target Contacts Directory
+                      </h3>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Manage decision makers and recruiting targets linked to this application.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={contactSort}
+                        onChange={(e) => setContactSort(e.target.value as any)}
+                        className="flex h-8 rounded-md border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="confidence">Highest Confidence</option>
+                        <option value="role">Role Alphabetical</option>
+                        <option value="recent">Recently Added</option>
+                      </select>
+
+                      <Button onClick={() => setIsDiscoverOpen(true)} size="sm" className="gap-1 text-xs h-8">
+                        <Sparkles className="h-3.5 w-3.5" /> Discover Public Contacts
+                      </Button>
+                    </div>
+                  </div>
+
+                  {contacts.length === 0 ? (
+                    <div className="text-center py-10 space-y-4">
+                      <Users className="h-10 w-10 text-muted-foreground/60 mx-auto animate-pulse" />
+                      <div>
+                        <h4 className="text-xs font-bold text-foreground">No contacts created yet</h4>
+                        <p className="text-[11px] text-muted-foreground mt-1 max-w-sm mx-auto">
+                          Click &quot;Discover Public Contacts&quot; to let Groq AI crawl public resources or add contacts manually using the discovery tool.
+                        </p>
+                      </div>
+                      <Button onClick={() => setIsDiscoverOpen(true)} variant="outline" size="sm" className="gap-1.5 text-xs">
+                        <Sparkles className="h-3.5 w-3.5" /> Discover Public Contacts
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-6 pt-4">
+                      {/* PREFERRED CONTACT SECTION */}
+                      {(() => {
+                        const preferred = contacts.find((c) => c.isPreferred);
+                        if (!preferred) return null;
+                        return (
+                          <div className="border border-primary/30 rounded-xl bg-primary/5 p-4 space-y-3 relative overflow-hidden">
+                            <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-[9px] font-black text-primary uppercase">
+                              Preferred Contact
+                            </span>
+                            <div className="flex items-start gap-3">
+                              <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center font-bold text-primary text-sm uppercase">
+                                {preferred.fullName.charAt(0)}
+                              </div>
+                              <div className="space-y-1">
+                                <h4 className="text-xs font-bold text-foreground">{preferred.fullName}</h4>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {preferred.jobTitle} {preferred.department ? `• ${preferred.department}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs pt-1">
+                      {preferred.email && (
+                        <a href={`mailto:${preferred.email}`} className="flex items-center gap-1.5 text-primary hover:underline truncate">
+                          <Mail className="h-3.5 w-3.5 shrink-0" /> {preferred.email}
+                        </a>
+                      )}
+                      {preferred.phone && (
+                        <span className="flex items-center gap-1.5 text-muted-foreground truncate">
+                          <Phone className="h-3.5 w-3.5 shrink-0" /> {preferred.phone}
+                        </span>
+                      )}
+                      {preferred.linkedin && (
+                        <a href={preferred.linkedin} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-primary hover:underline truncate">
+                          <Linkedin className="h-3.5 w-3.5 shrink-0" /> LinkedIn Profile
+                        </a>
+                      )}
+                    </div>
+                            <div className="flex items-center justify-between gap-4 pt-2 border-t border-border/20 text-[10px] text-muted-foreground">
+                              <span>Source: <a href={preferred.sourceUrl} target="_blank" rel="noreferrer" className="underline">{preferred.sourceType.replace(/_/g, " ")}</a></span>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePreferred(preferred._id!, true)}
+                                  className="text-primary hover:underline font-semibold cursor-pointer"
+                                >
+                                  Unmark Preferred
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteContact(preferred._id!)}
+                                  className="text-destructive hover:underline font-semibold cursor-pointer"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* OTHER CONTACT CATEGORIES */}
+                      {(() => {
+                        const list = [...contacts].sort((a, b) => {
+                          if (contactSort === "confidence") return b.confidenceScore - a.confidenceScore;
+                          if (contactSort === "role") return a.jobTitle.localeCompare(b.jobTitle);
+                          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+                        });
+
+                        const nonPreferred = list.filter((c) => !c.isPreferred);
+                        if (nonPreferred.length === 0) return null;
+
+                        const categories = [
+                          {
+                            title: "Recruiting & Talent Acquisition",
+                            items: nonPreferred.filter((c) => /recruiter|talent|acquisition|hr|sourcer|hiring/i.test(c.jobTitle)),
+                          },
+                          {
+                            title: "Engineering & Hiring Managers",
+                            items: nonPreferred.filter((c) => /manager|director|lead|head|cto|vp|engineering/i.test(c.jobTitle) && !/recruiter|talent|acquisition/i.test(c.jobTitle)),
+                          },
+                          {
+                            title: "Founders & Executive Officers",
+                            items: nonPreferred.filter((c) => /founder|ceo|president|co-founder/i.test(c.jobTitle) && !/manager|director|lead|head/i.test(c.jobTitle)),
+                          },
+                          {
+                            title: "Other Discovered Contacts",
+                            items: nonPreferred.filter((c) =>
+                              !/recruiter|talent|acquisition|hr|sourcer|hiring/i.test(c.jobTitle) &&
+                              !/manager|director|lead|head|cto|vp|engineering/i.test(c.jobTitle) &&
+                              !/founder|ceo|president|co-founder/i.test(c.jobTitle)
+                            ),
+                          },
+                        ].filter((cat) => cat.items.length > 0);
+
+                        return (
+                          <div className="space-y-6">
+                            {categories.map((cat, cIdx) => (
+                              <div key={cIdx} className="space-y-2.5">
+                                <h4 className="text-[10px] font-black text-foreground uppercase tracking-widest pl-1">
+                                  {cat.title} ({cat.items.length})
+                                </h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  {cat.items.map((item) => {
+                                    const isLowConfidence = item.confidenceScore < 70;
+                                    return (
+                                      <div key={item._id} className="border border-border/40 rounded-xl bg-secondary/15 p-4 space-y-3 relative overflow-hidden flex flex-col justify-between">
+                                        <div className="space-y-2">
+                                          <div className="flex items-start justify-between gap-4">
+                                            <div className="flex items-center gap-2">
+                                              <div className="h-8 w-8 rounded-full bg-secondary border border-border/40 flex items-center justify-center font-bold text-muted-foreground text-xs uppercase">
+                                                {item.fullName.charAt(0)}
+                                              </div>
+                                              <div>
+                                                <h5 className="text-xs font-bold text-foreground">{item.fullName}</h5>
+                                                <p className="text-[10px] text-muted-foreground truncate max-w-[150px]">{item.jobTitle}</p>
+                                              </div>
+                                            </div>
+                                            {isLowConfidence ? (
+                                              <span className="px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/20 text-[8px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-tight shrink-0">
+                                                Low Confidence ({item.confidenceScore}%)
+                                              </span>
+                                            ) : (
+                                              <span className="px-1.5 py-0.2 rounded bg-teal-500/10 border border-teal-500/20 text-[8px] font-black text-teal-600 dark:text-teal-500 uppercase tracking-tight shrink-0">
+                                                {item.confidenceScore}% Confidence
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <div className="space-y-1.5 pt-1 text-[11px]">
+                                            {item.email && (
+                                              <a href={`mailto:${item.email}`} className="flex items-center gap-1.5 text-primary hover:underline truncate">
+                                                <Mail className="h-3 w-3 shrink-0" /> {item.email}
+                                              </a>
+                                            )}
+                                            {item.phone && (
+                                              <span className="flex items-center gap-1.5 text-muted-foreground truncate">
+                                                <Phone className="h-3 w-3 shrink-0" /> {item.phone}
+                                              </span>
+                                            )}
+                                            {item.linkedin && (
+                                              <a href={item.linkedin} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-primary hover:underline truncate">
+                                                <Linkedin className="h-3 w-3 shrink-0" /> LinkedIn Handle
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-4 pt-2.5 border-t border-border/20 text-[9px] text-muted-foreground mt-2">
+                                          <span>Source: <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="underline">{item.sourceType.replace(/_/g, " ")}</a></span>
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleTogglePreferred(item._id!, false)}
+                                              className="text-primary hover:underline font-semibold cursor-pointer"
+                                            >
+                                              Make Preferred
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteContact(item._id!)}
+                                              className="text-destructive hover:underline font-semibold cursor-pointer"
+                                            >
+                                              Delete
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            )}
           </div>
         </div>
       </main>
+
 
       {/* Edit Company Dialog */}
       <EditCompanyDialog
@@ -806,6 +1096,15 @@ export default function CompanyDetailsPage() {
         company={company}
         onSuccess={fetchCompany}
       />
+
+      {/* Discover Contacts Wizard Dialog */}
+      <DiscoverContactsDialog
+        isOpen={isDiscoverOpen}
+        onClose={() => setIsDiscoverOpen(false)}
+        companyId={id}
+        onSuccess={fetchContacts}
+      />
     </div>
   );
 }
+
